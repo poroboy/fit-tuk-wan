@@ -81,7 +81,9 @@ export function beep(kind = 'tick') {
     unlockAudio();
     const seq = kind === 'done' ? [[880, 0, 0.16], [1175, 0.2, 0.16], [1568, 0.4, 0.32]]
       : kind === 'go' ? [[660, 0, 0.12], [990, 0.15, 0.25]]
-        : [[740, 0, 0.09]];
+        : kind === 'up' ? [[988, 0, 0.12]]
+          : kind === 'soft' ? [[520, 0, 0.07]]
+            : [[740, 0, 0.09]];
     for (const [f, t, d] of seq) {
       const o = actx.createOscillator(), g = actx.createGain();
       o.type = 'sine'; o.frequency.value = f;

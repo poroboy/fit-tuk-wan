@@ -94,6 +94,7 @@ function remindersCard() {
   for (const ins of bodyInsights(weightLogs(), measureLogs(), profile().goalMode)) items.push({ k: ins.kind, i: ins.icon, t: esc(ins.text) });
   const t = targets(), tot = sum(foodOn(date));
   if (now.getHours() >= 18 && tot.p > 0 && tot.p < t.protein * 0.8) items.push({ k: 'warn', i: '🥚', t: `โปรตีนยังขาด <b>${fmt(t.protein - tot.p)} g</b> ลองไข่ต้ม 2 ฟอง หรือนม 1 กล่อง`, href: '#/food' });
+  if (now.getHours() >= 17 && tot.kcal > 0 && tot.kcal < t.kcal - 300) items.push({ k: 'warn', i: '🍚', t: `แคลยังขาด <b>${fmt(t.kcal - tot.kcal)} kcal</b> แตะดูเมนูแนะนำเพิ่มแคล`, href: '#/food' });
   items.push({ k: '', i: '😴', t: '<b>อย่าลืมนอน 7–8 ชม.</b> กล้ามซ่อมแซมตัวเองตอนนอน' });
   return `<div class="card"><div class="card-h"><h3>เตือนความจำ</h3></div><div class="col">
     ${items.map(x => `<${x.href ? `a href="${x.href}" style="text-decoration:none"` : 'div'} class="alert ${x.k}" ${x.act ? `data-act="${x.act}" role="button"` : ''}><span class="ai">${x.i}</span><div>${x.t}</div></${x.href ? 'a' : 'div'}>`).join('')}

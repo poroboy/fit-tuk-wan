@@ -46,6 +46,7 @@ export function render() {
       </div>
       ${tg('sound', s.sound, 'เสียงจับเวลา')}
       ${tg('vibrate', s.vibrate, 'สั่นเมื่อครบเวลา')}
+      ${tg('voiceCount', s.voiceCount, 'เสียงพูดนับจำนวนครั้ง', 'ตอนกด "นับให้" ในโหมดนำเล่น (ปิดแล้วจะเหลือแค่เสียงบี๊บ)')}
     </div>
 
     <div class="section-title">บอร์ดวิดพื้น · สีของช่อง</div>
@@ -75,7 +76,7 @@ export function render() {
       <label class="field"><span>เวลาเตือนเล่น</span><input class="input" type="time" data-s="reminderTime" value="${s.reminderTime}"></label>
       ${tg('mealReminder', s.mealReminder, 'เตือนบันทึกอาหารหลังมื้อ', 'ถ้ามื้อนั้นยังไม่ได้บันทึก')}
       <div class="grid3">${[['breakfast', 'เช้า'], ['lunch', 'กลางวัน'], ['dinner', 'เย็น']].map(([k, n]) => `<label class="field"><span>${n}</span><input class="input" type="time" data-meal="${k}" value="${s.mealTimes[k]}"></label>`).join('')}</div>
-      ${tg('proteinReminder', s.proteinReminder, 'เตือนเมื่อโปรตีนยังขาด', `ตอน ${s.proteinTime} ถ้ายังไม่ถึง 80% ของเป้า`)}
+      ${tg('proteinReminder', s.proteinReminder, 'เตือนเมื่อโปรตีน/แคลยังขาด', `ตอน ${s.proteinTime} พร้อมแนะนำเมนูเพิ่ม`)}
       ${tg('weighReminder', s.weighReminder, 'เตือนชั่งน้ำหนัก', 'เช้าวันจันทร์')}
       ${tg('measureReminder', s.measureReminder, 'เตือนวัดรอบตัว + ถ่ายรูป', 'วันที่ 1 ของเดือน')}
       <details class="more"><summary>📅 เตือนแน่นอนแม้ปิดแอป (Google Calendar)</summary>

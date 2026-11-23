@@ -1,6 +1,7 @@
-import { targets, foodOn, addFood, addFoods, updateFood, deleteFood, myMeals, saveMyMeals, uid } from '../data.js';
+import { targets, foodOn, foodLogs, addFood, addFoods, updateFood, deleteFood, myMeals, saveMyMeals, uid } from '../data.js';
 import { ymd, addDays, thaiDate } from '../plan.js';
-import { MEALS, values, qtyLabel, sum, localEstimate } from '../foods.js';
+import { MEALS, values, qtyLabel, sum, localEstimate, snapshot } from '../foods.js';
+import { suggestAddOns, mealForNow } from '../suggest.js';
 
 const image0 = a => !!a.image && !a.text.trim();
 import { esc, fmt, ringSVG, animateRings, openSheet, stepperHTML, bindStepper, toast, confirmDialog } from '../ui.js';
@@ -33,6 +34,7 @@ export function render() {
       </div>
       <div class="macro">${macroBar('คาร์บ', tot.c, t.carb, 'var(--carb)')}${macroBar('ไขมัน', tot.f, t.fat, 'var(--fat)')}${macroBar('โปรตีน', tot.p, t.protein, 'var(--protein)')}</div>
     </div>
+    ${suggestHTML(t, tot, logs)}
     ${MEALS.map(m => {
       const items = logs.filter(l => l.meal === m.key);
       const ms = sum(items);
@@ -57,7 +59,47 @@ export function mount(root) {
     else if (act === 'next') { if (date < ymd()) { date = addDays(date, 1); refresh(); } }
     else if (act === 'add') addSheet(a.dataset.meal);
     else if (act === 'edit') editSheet(a.dataset.id);
+    else if (act === 'sugmore') { sugShift += 3; refresh(true); }
+    else if (act === 'sugadd' || act === 'sugall') {
+      const picks = sugPicks();
+      const chosen = act === 'sugall' ? picks : [picks[+a.dataset.i]].filter(Boolean);
+      const meal = mealForNow();
+      addFoods(chosen.map(f => ({ ...snapshot(f), qty: f.qty, date, meal })));
+      toast(`เพิ่ม ${chosen.map(f => f.name).join(', ')} แล้ว`);
+      refresh(true);
+    }
   });
+}
+
+// ---------- "still short" suggestions ----------
+let sugShift = 0;
+function suggestHTML(t, tot, logs) {
+  if (date !== ymd()) return '';
+  const gapK = Math.round(t.kcal - tot.kcal), gapP = Math.round(t.protein - tot.p);
+  if (gapK < 150 && gapP < 10) return '';
+  const hour = new Date().getHours();
+  if (!logs.length && hour < 11) return ''; // nothing logged yet this morning — no need to nag
+  const usesWhey = logs.some(l => /เวย์|whey/i.test(l.name)) || foodLogs().some(l => /เวย์|whey/i.test(l.name));
+  const picks = suggestAddOns(gapK, gapP, { shift: sugShift, usesWhey });
+  if (!picks.length) return '';
+  const meal = mealForNow();
+  const mealName = MEALS.find(m => m.key === meal).name;
+  const pk = picks.reduce((a, f) => a + f.kcal * f.qty, 0), pp = picks.reduce((a, f) => a + f.p * f.qty, 0);
+  const headline = gapK >= 150 && gapP >= 10 ? `ยังขาด <b>${fmt(gapK)} kcal</b> และโปรตีน <b>${fmt(gapP)} g</b>`
+    : gapK >= 150 ? `แคลยังขาดอีก <b>${fmt(gapK)} kcal</b> (โปรตีนครบแล้ว ✅)` : `โปรตีนยังขาดอีก <b>${fmt(gapP)} g</b>`;
+  const tip = hour < 18 ? 'ยังมีมื้อเหลือ เติมในมื้อถัดไปหรือเป็นของว่างได้' : 'เติมเป็นของว่างก่อนนอนได้ เช่น นม กล้วย ถั่ว';
+  return `<div class="card sug">
+    <div class="card-h"><h3>💡 เติมให้ถึงเป้า</h3><button class="btn btn-ghost btn-sm" data-act="sugmore">แนะนำอย่างอื่น ↻</button></div>
+    <p class="small">${headline}<br><span class="muted">${tip}</span></p>
+    <div class="col" style="gap:0;margin-top:6px">${picks.map((f, i) => `<div class="food-row"><div class="grow"><b>${esc(f.name)}</b><small>${f.qty > 1 ? f.qty + ' × ' : ''}${esc(f.unit)} · ${fmt(f.kcal * f.qty)} kcal · P ${fmt(f.p * f.qty, 1)} g</small></div>
+      <button class="btn btn-soft btn-sm" data-act="sugadd" data-i="${i}">+ เพิ่ม</button></div>`).join('')}</div>
+    <button class="btn btn-primary btn-block" style="margin-top:10px" data-act="sugall">เพิ่มทั้งหมดลง${mealName} (+${fmt(pk)} kcal · P ${fmt(pp, 1)} g)</button>
+  </div>`;
+}
+function sugPicks() {
+  const t = targets(), tot = sum(foodOn(date));
+  const usesWhey = foodLogs().some(l => /เวย์|whey/i.test(l.name));
+  return suggestAddOns(Math.round(t.kcal - tot.kcal), Math.round(t.protein - tot.p), { shift: sugShift, usesWhey });
 }
 
 // ---------- AI estimate pane ----------

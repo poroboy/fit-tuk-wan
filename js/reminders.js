@@ -30,8 +30,11 @@ export function dueReminders(ctx, now = new Date()) {
     const kg = weights.length ? weights[weights.length - 1].weightKg : profile.weightKg;
     const t = computeTargets(profile, kg);
     const p = foodLogs.filter(l => l.date === date).reduce((sum, it) => sum + it.p * (it.per === '100g' ? it.qty / 100 : it.qty), 0);
+    const kcal = foodLogs.filter(l => l.date === date).reduce((sum, it) => sum + it.kcal * (it.per === '100g' ? it.qty / 100 : it.qty), 0);
     if (p > 0 && p < t.protein * 0.8) {
-      out.push({ key: `p-${date}`, title: `โปรตีนยังขาดอีก ${Math.round(t.protein - p)} g`, body: 'ลองไข่ต้ม นม หรืออกไก่ก่อนนอน', url: '#/food' });
+      out.push({ key: `p-${date}`, title: `โปรตีนยังขาดอีก ${Math.round(t.protein - p)} g`, body: 'ลองไข่ต้ม นม หรืออกไก่ก่อนนอน แตะดูเมนูแนะนำ', url: '#/food' });
+    } else if (kcal > 0 && kcal < t.kcal - 300) {
+      out.push({ key: `k-${date}`, title: `แคลยังขาดอีก ${Math.round(t.kcal - kcal)} kcal`, body: 'เพิ่มกล้ามต้องกินให้ถึง ลองนม กล้วย ถั่ว หรือข้าวเพิ่ม 1 ทัพพี แตะดูเมนูแนะนำ', url: '#/food' });
     }
   }
   if (s.weighReminder && now.getDay() === 1 && mins >= 7 * 60 && mins < 12 * 60) {

@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS = {
   theme: 'auto',
   sound: true,
   vibrate: true,
+  voiceCount: true,
   waterGoal: 8,
   workoutReminder: true,
   reminderTime: '19:00',

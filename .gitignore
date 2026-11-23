@@ -1,3 +1,7 @@
 .claude/
 *.log
 fitness-super-app-spec.md
+
+# personal data exported from the app (weight, food, photos) - never publish
+fit-tuk-wan-backup*.json
+*backup*.json

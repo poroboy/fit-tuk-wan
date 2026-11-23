@@ -557,3 +557,16 @@ details.roadmap[open] summary h3::after { content: ' ▴'; }
 .rm.now > .grow { background: var(--brand-soft); border-radius: 12px; padding: 6px 10px; margin: -6px 0; }
 
 .side-hint { font-size: 12.5px; line-height: 1.4; color: var(--m-back); background: color-mix(in srgb, var(--m-back) 10%, transparent); padding: 5px 9px; border-radius: 10px; }
+
+.sug { border: 1.5px dashed color-mix(in srgb, var(--brand) 45%, var(--line)); }
+
+/* rep counter overlay */
+.count-ov { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 96px; padding: 8px 12px; border-radius: 18px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: var(--shadow); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.count-ov b { font-size: 54px; line-height: 1; font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; }
+.count-ov b.pop { animation: pop .35s cubic-bezier(.3,1.8,.5,1); }
+.count-ov span { font-size: 12.5px; font-weight: 600; text-align: center; }
+.count-ov em { font-style: normal; font-size: 11.5px; color: var(--m-back); font-weight: 700; }
+.count-ov.wait b { color: var(--muted); }
+.player .fig-view { display: none; }

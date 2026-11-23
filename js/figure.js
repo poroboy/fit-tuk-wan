@@ -161,6 +161,7 @@ function sample(tempo, t) {
   }
   return { p: prev, label: lastLabel };
 }
+export const tempoOf = key => (ANIMS[key] ? ANIMS[key].tempo : null);
 export const tempoLength = key => (ANIMS[key] ? ANIMS[key].tempo.reduce((s, x) => s + x[1], 0) : 4);
 
 // ---------- scenery ----------
