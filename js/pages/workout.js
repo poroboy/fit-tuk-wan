@@ -8,6 +8,8 @@ import { exerciseSheet, repsSheet, plankSheet, celebrateSheet, muscleChips } fro
 import { startRest } from '../timer.js';
 import { lineChart, barChart } from '../charts.js';
 import { openPlayer } from '../player.js';
+import { openRoutine, ROUTINES, routineMinutes } from '../routine.js';
+import { saveLog, saveMeta } from '../data.js';
 import { refresh } from '../app.js';
 
 export const title = 'ออกกำลังกาย';
@@ -143,6 +145,7 @@ function todayHTML() {
       <p class="small muted">${KIND_SHORT[done.kind]} · ${fmt(st.reps)} ครั้ง · ${fmt(st.volume)} กก. · ${done.durationMin || '-'} นาที</p></div></div>
       <div class="row" style="margin-top:10px"><button class="btn btn-sm" data-act="view" data-id="${done.id}">ดูรายละเอียด</button>
       <button class="btn btn-sm btn-ghost" data-act="again">เล่นอีกชุด</button></div></div>`;
+    html += routineCard('cool', done.cooldownDone);
     return html + extrasHTML(info);
   }
 
@@ -174,11 +177,24 @@ function todayHTML() {
     <button class="btn btn-primary btn-lg btn-block" style="margin-top:12px" data-act="play" data-kind="${kind}">${log && pr.done ? '▶ เล่นต่อ (โหมดนำเล่น)' : '▶ เริ่มเล่น (โหมดนำเล่น)'}</button>
     <p class="tiny muted center" style="margin-top:6px">หรือแตะวงกลมด้านล่างเพื่อติ๊กทีละเซ็ต</p>
   </div>`;
+  html += routineCard('warm', log && log.warmupDone);
   html += guideBanner(log, items, plan.mode);
   html += items.map((p, i) => exCard(log, p, i, plan)).join('');
+  html += routineCard('cool', log && log.cooldownDone);
   if (log && pr.done) html += `<button class="btn btn-ok btn-block btn-lg" data-act="finish">จบการออกกำลังกายวันนี้ ✓</button>`;
   if (log) html += `<button class="btn btn-ghost" data-act="discard" data-id="${log.id}">ยกเลิกการเล่นครั้งนี้</button>`;
   return html + extrasHTML(info);
+}
+
+export function routineCard(kind, done) {
+  const r = ROUTINES[kind];
+  done = !!done || meta()[`${kind}Date`] === ymd();
+  return `<div class="card routine-card ${done ? 'done' : ''}">
+    <div class="row"><div class="rt-ico">${r.icon}</div>
+      <div class="grow"><b>${r.title} ${done ? '✓' : ''}</b><div class="small muted">${r.items.length} ท่า · ~${routineMinutes(kind)} นาที · ${kind === 'warm' ? 'ทำก่อนเล่น' : 'ทำหลังเล่นเสร็จ'}</div></div>
+      <button class="btn ${done ? 'btn-soft' : 'btn-primary'} btn-sm" data-act="routine" data-k="${kind}">${done ? 'ทำอีกครั้ง' : '▶ เริ่ม'}</button></div>
+    <div class="rt-moves">${r.items.map(it => `<button class="chip" data-act="info" data-id="${it.exId}">${EXERCISES[it.exId].nameTh.replace(/\s*\(.*\)/, '')}${it.perSide ? ' ↔️' : ''}</button>`).join('')}</div>
+  </div>`;
 }
 
 // "what to do now" guide above the exercise list
@@ -335,6 +351,18 @@ export function mount(root) {
       createSession(ymd(), act === 'again' && choice.info.phase.mode === 'split' ? (choice.kind === 'A' ? 'B' : 'A') : kind, { extra: true });
       refresh(true);
     } else if (act === 'view') viewLog(a.dataset.id);
+    else if (act === 'routine') {
+      const kind = a.dataset.k;
+      openRoutine(kind, {
+        onDone: done => {
+          if (!done) return;
+          saveMeta({ [`${kind}Date`]: ymd() });
+          const log = activeSession(ymd()) || lastCompletedOn(ymd());
+          if (log) { log[kind === 'warm' ? 'warmupDone' : 'cooldownDone'] = true; saveLog(log); }
+          refresh(true);
+        },
+      });
+    }
     else if (act === 'stay') {
       if (await confirmDialog('เลื่อนแผนทั้งหมดออกไป 1 สัปดาห์? (สัปดาห์หน้าจะยังอยู่ช่วงเดิม แก้กลับได้ในตั้งค่า)', { ok: 'อยู่ช่วงเดิมต่อ' })) {
         const s = settings();

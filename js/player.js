@@ -3,6 +3,8 @@ import { workoutLogs } from './data.js';
 import { EXERCISES } from './exercises.js';
 import { figHTML, mountFigures, restartFigure } from './figure.js';
 import { createCounter, speak } from './counter.js';
+import { openRoutine, routineMinutes } from './routine.js';
+import { saveLog, meta } from './data.js';
 import { esc, confirmDialog } from './ui.js';
 import { steps, getSet, nextStep, progress, markSet, finishSession, restAfter, lastReps } from './session.js';
 import { repsSheet, plankSheet, celebrateSheet, exerciseSheet, muscleChips } from './sheets.js';
@@ -80,6 +82,9 @@ function draw() {
   const phase = PHASES.find(x => x.n === log.phase) || PHASES[0];
   el.innerHTML = `<div class="player-in">
     ${header(log)}
+    ${progress(log).done === 0 && !log.warmupDone && !log.warmupSkipped && meta().warmDate !== log.date ? `<div class="card warm-cta"><div class="row">
+      <div style="font-size:28px">🔥</div><div class="grow"><b>วอร์มอัพก่อนไหม?</b><div class="small muted">5 ท่า · ~${routineMinutes('warm')} นาที · ลดโอกาสบาดเจ็บ</div></div></div>
+      <div class="grid2" style="margin-top:10px"><button class="btn btn-primary" data-a="warm">▶ วอร์มอัพ</button><button class="btn" data-a="nowarm">ข้าม</button></div></div>` : ''}
     ${figHTML(p.exId, { label: true, view: ex.view || '' })}
     <div>
       <div class="row between"><h2>${esc(ex.nameTh)}</h2><button class="icon-btn" data-a="info" aria-label="วิธีทำ">ⓘ</button></div>
@@ -162,6 +167,10 @@ async function onClick(e) {
   if (!st) return;
   const p = log.plan[st.exIdx];
   if (act === 'count') return startCount(log, st, p);
+  if (act === 'warm') {
+    return openRoutine('warm', { onDone: done => { const l = getLog(); if (l) { if (done) l.warmupDone = true; else l.warmupSkipped = true; saveLog(l); } if (el) draw(); } });
+  }
+  if (act === 'nowarm') { log.warmupSkipped = true; saveLog(log); return draw(); }
   if (act === 'cstop') { const r = stopCounter(); return saveSet(log, st, p, { prefill: r ? r.reps : null }); }
   if (act === 'ccancel') { stopCounter(); draw(); return; }
   let res = null;

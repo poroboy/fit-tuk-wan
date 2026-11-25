@@ -410,6 +410,125 @@ function flyPose(p) {
   return it;
 }
 
+// ---------- warm-up poses ----------
+function stepJackPose(p, t = 0) {
+  const side = Math.floor(t / 1.6) % 2 ? 1 : -1; // which leg steps out this rep
+  const j = standFront();
+  const uaL = lerp(98, 232, p);
+  j.elL = pol(j.shL, uaL, 20); j.haL = pol(j.elL, uaL + 6, 18);
+  j.elR = pol(j.shR, mir(uaL), 20); j.haR = pol(j.elR, mir(uaL + 6), 18);
+  const out = 14 * p;
+  if (side < 0) { j.anL = P(j.anL.x - out, j.anL.y); j.knL = lerpP(j.hipL, j.anL, 0.5); }
+  else { j.anR = P(j.anR.x + out, j.anR.y); j.knR = lerpP(j.hipR, j.anR, 0.5); }
+  const it = []; frontBody(it, j); return it;
+}
+function armCirclePose(p, t = 0) {
+  const th = t * Math.PI * 2 / 1.1 * (Math.floor(t / 8) % 2 ? -1 : 1);
+  const j = standFront();
+  const ua = 180 + 9 * Math.sin(th);
+  j.elL = pol(j.shL, ua, 20); j.haL = pol(j.elL, ua + 4 * Math.cos(th), 18);
+  j.elR = pol(j.shR, mir(ua), 20); j.haR = pol(j.elR, mir(ua + 4 * Math.cos(th)), 18);
+  const it = []; frontBody(it, j); return it;
+}
+function armSwingPose(p) {
+  const j = standFront();
+  // open wide (p=0) -> crossed in front (p=1); arms seen head-on so they look shorter when forward
+  const reach = lerp(38, 22, p);
+  const hxL = lerp(j.shL.x - 38, 110, p), hxR = lerp(j.shR.x + 38, 90, p);
+  j.haL = P(hxL, 44 + 2 * p); j.elL = P(lerp(j.shL.x, hxL, 0.5), 43);
+  j.haR = P(hxR, 46 - 2 * p); j.elR = P(lerp(j.shR.x, hxR, 0.5), 44);
+  void reach;
+  const it = []; frontBody(it, j); return it;
+}
+function torsoTwistPose(p) {
+  const s = lerp(-1, 1, p);
+  const j = standFront();
+  const w = 15 * (1 - 0.22 * Math.abs(s));
+  j.neck = P(100 + 3 * s, 36); j.head = P(100 + 4 * s, 23);
+  j.shL = P(j.neck.x - w, 40); j.shR = P(j.neck.x + w, 40);
+  const H = P(100 + 22 * s, 50);
+  j.haL = P(H.x - 4, H.y); j.haR = P(H.x + 4, H.y);
+  j.elL = ik(j.shL, j.haL, 20, 18, 1); j.elR = ik(j.shR, j.haR, 20, 18, -1);
+  const it = []; frontBody(it, j); return it;
+}
+let INC = null;
+function inclinePose(p) {
+  if (!INC) {
+    const an = P(52, 120.5), hand = P(122, 89.5);
+    INC = { an, hand, aTop: angOf(an, circX(an, 85, hand, 36, -1)), aBot: angOf(an, circX(an, 85, hand, 17, -1)) };
+  }
+  const a = lerp(INC.aTop, INC.aBot, p);
+  const an = INC.an, hand = INC.hand;
+  const hip = pol(an, a, 53), neck = pol(hip, a, 34), sh = pol(hip, a, 31);
+  const haF = P(hand.x - 2.5, hand.y), shF = P(sh.x - 2, sh.y);
+  const to = P(an.x + 3, an.y + 4.2);
+  const j = {
+    hip, neck, head: pol(neck, a - 6, 13), up: a - 6,
+    knN: pol(hip, a + 180, 27), anN: an, toN: to, knF: pol(hip, a + 180.6, 27), anF: P(an.x - 1, an.y), toF: P(to.x - 1, to.y),
+    shN: sh, haN: hand, elN: ik(sh, hand, 20, 18, 1), shF, haF, elF: ik(shF, haF, 20, 18, 1),
+  };
+  const it = []; sideBody(it, j); return it;
+}
+
+// ---------- cool-down poses (held, with a slow breath) ----------
+function chestStretchPose(p) {
+  const j = standSide();
+  const lean = 3 * p;
+  j.neck = pol(j.hip, -90 + lean, 34); j.head = pol(j.neck, -90 + lean, 13);
+  j.shN = P(j.neck.x + 1, j.neck.y + 4); j.shF = P(j.neck.x - 3, j.neck.y + 4);
+  j.haN = P(58, j.shN.y - 2); j.elN = lerpP(j.shN, j.haN, 0.53);
+  j.elF = pol(j.shF, 92, 20); j.haF = pol(j.elF, 90, 18);
+  const it = []; sideBody(it, j); return it;
+}
+function tricepsStretchPose(p) {
+  const j = standSide();
+  j.elN = pol(j.shN, -100 - 4 * p, 20); j.haN = pol(j.elN, 108, 18);
+  j.elF = ik(j.shF, P(j.elN.x + 3, j.elN.y + 2), 20, 18, -1); j.haF = P(j.elN.x + 3, j.elN.y + 2);
+  const it = []; sideBody(it, j, { armFront: true }); return it;
+}
+function shoulderStretchPose(p) {
+  const j = standFront();
+  // left arm straight across the chest, right forearm hooks it near the elbow
+  const a = lerp(8, 2, p);
+  j.elL = pol(j.shL, a, 20); j.haL = pol(j.elL, a, 18);
+  const hook = P(j.elL.x - 1, j.elL.y + 3);
+  j.haR = hook; j.elR = ik(j.shR, hook, 20, 18, 1);
+  const it = []; frontBody(it, j); return it;
+}
+function cobraPose(p) {
+  const hip = P(88, 119.5);
+  const a = lerp(-38, -46, p);
+  const neck = pol(hip, a, 34), sh = pol(hip, a, 31);
+  const up = a + 15;
+  const ha = P(sh.x + 6, 123), haF = P(sh.x + 3, 123);
+  const knN = pol(hip, 180, 27), anN = pol(knN, 180, 26), knF = pol(P(86, 118.5), 180, 27), anF = pol(knF, 180, 26);
+  const j = {
+    hip, neck, head: pol(neck, up, 13), up,
+    knN, anN, toN: pol(anN, -150, 6), knF, anF, toF: pol(anF, -150, 6),
+    shN: sh, haN: ha, elN: ik(sh, ha, 20, 18, -1), shF: P(sh.x - 2, sh.y), haF, elF: ik(P(sh.x - 2, sh.y), haF, 20, 18, -1),
+  };
+  const it = []; sideBody(it, j); return it;
+}
+function childPosePose(p) {
+  const hip = P(78, lerp(111, 109.5, p));
+  const a = 12;
+  const neck = pol(hip, a, 34), sh = pol(hip, a, 31);
+  const up = 30;
+  const kn = P(102, 121), an = P(74, 122.5);
+  const ha = P(172, 123.5), haF = P(169, 123.5);
+  const j = {
+    hip, neck, head: pol(neck, up, 12.5), up,
+    knN: kn, anN: an, toN: pol(an, 180, 7), knF: P(100, 121), anF: P(72, 122.5), toF: P(65, 122.5),
+    shN: sh, haN: ha, elN: lerpP(sh, ha, 0.52), shF: P(sh.x - 2, sh.y), haF, elF: lerpP(P(sh.x - 2, sh.y), haF, 0.52),
+  };
+  const it = []; sideBody(it, j); return it;
+}
+const JACK = [[1, 0.7, 'ก้าวออก แขนขึ้น'], [0, 0.7, 'กลับ'], [0, 0.2, '']];
+const CIRCLE = [[1, 4, 'หมุนแขนต่อเนื่อง'], [0, 4, 'หมุนแขนต่อเนื่อง']];
+const SWING = [[1, 0.7, 'กอดอก'], [0, 0.7, 'กางแขน']];
+const TWIST_STAND = [[1, 1, 'บิดตัว'], [0, 1, 'บิดอีกข้าง']];
+const HOLD = [[1, 3, 'หายใจเข้าลึกๆ'], [0, 3, 'หายใจออก ผ่อนคลาย']];
+const wall = () => '<rect class="fig-bed2" x="40" y="-8" width="10" height="136"/>';
 const LOW = '15 18 170 119';
 function rowPose(p) {
   const hip = P(84, 73), hipF = P(81, 73);
@@ -489,6 +608,16 @@ const ANIMS = {
   reverse_fly: { tempo: RFLY, props: () => floor(shadow(100, 24)), pose: reverseFlyPose },
   bench_dip: { tempo: PUSH, props: () => floor(dipBed() + shadow(95, 26)), pose: dipPose },
   russian_twist: { vb: LOW, tempo: TWIST, props: () => floor(mat(50, 150)), pose: twistPose },
+  step_jack: { tempo: JACK, props: () => floor(shadow(100, 26)), pose: stepJackPose },
+  arm_circles: { tempo: CIRCLE, props: () => floor(shadow(100, 24)), pose: armCirclePose },
+  arm_swing: { tempo: SWING, props: () => floor(shadow(100, 24)), pose: armSwingPose },
+  torso_twist: { tempo: TWIST_STAND, props: () => floor(shadow(100, 24)), pose: torsoTwistPose },
+  incline_pushup: { tempo: PUSH, props: () => floor(rowBed() + shadow(80, 30)), pose: inclinePose },
+  chest_stretch: { tempo: HOLD, props: () => floor(wall() + shadow(98, 20)), pose: chestStretchPose },
+  triceps_stretch: { tempo: HOLD, props: () => floor(shadow(98, 20)), pose: tricepsStretchPose },
+  shoulder_stretch: { tempo: HOLD, props: () => floor(shadow(100, 24)), pose: shoulderStretchPose },
+  cobra: { vb: LOW, tempo: HOLD, props: () => floor(mat(20, 170)), pose: cobraPose },
+  child_pose: { vb: LOW, tempo: HOLD, props: () => floor(mat(40, 185)), pose: childPosePose },
 };
 export const hasAnim = key => !!ANIMS[key];
 
@@ -521,7 +650,7 @@ export function mountFigures(root) {
     el._fig = f;
     if (io) io.observe(el);
     live.add(f);
-    draw(f, def.pose(f.still ? 0.55 : 0));
+    draw(f, def.pose(f.still ? 0.55 : 0, 0));
   });
   if (!running && live.size) { running = true; requestAnimationFrame(loop); }
 }
@@ -536,8 +665,9 @@ function loop(now) {
     if (!f.visible || f.still) continue;
     f.frame++;
     if (f.small && f.frame % 2) continue;
-    const { p, label } = sample(f.def.tempo, (now - f.t0) / 1000);
-    draw(f, f.def.pose(p));
+    const tt = (now - f.t0) / 1000;
+    const { p, label } = sample(f.def.tempo, tt);
+    draw(f, f.def.pose(p, tt));
     if (f.labelEl && label !== f.lastLabel) { f.labelEl.textContent = label; f.lastLabel = label; }
   }
   if (live.size) requestAnimationFrame(loop);

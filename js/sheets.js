@@ -9,6 +9,8 @@ import { beep, buzz, keepAwake } from './notify.js';
 import { fmtSec } from './timer.js';
 import { sessionStats } from './session.js';
 import { KIND_SHORT, isPerSide } from './plan.js';
+import { openRoutine, routineMinutes } from './routine.js';
+import { saveLog } from './data.js';
 
 const BACKPACK = ['pushup', 'pushup_decline', 'pushup_wide', 'pushup_narrow'];
 
@@ -122,7 +124,11 @@ export function celebrateSheet(log, streak) {
   const st = sessionStats(log);
   confetti();
   beep('done');
-  openSheet({
+  const sh = openSheet({
+    onMount: el => {
+      const b = el.querySelector('[data-cool]');
+      if (b) b.onclick = () => { sh.close(); openRoutine('cool', { onDone: done => { if (done) { log.cooldownDone = true; saveLog(log); } } }); };
+    },
     body: `<div class="celebrate">
       ${flameSVG(streak)}
       <h2>เยี่ยมมาก! ไฟติด ${streak} 🔥</h2>
@@ -134,7 +140,8 @@ export function celebrateSheet(log, streak) {
         <div class="tile"><small>เผาผลาญประมาณ</small><b>${fmt(log.kcalBurned)}</b><span>kcal · ${log.durationMin} นาที</span></div>
       </div>
       <div class="alert ok" style="width:100%;text-align:left"><span class="ai">🥚</span><div>อย่าลืมกินโปรตีนภายในวันนี้ให้ถึงเป้า และนอนให้ได้ 7–8 ชม.</div></div>
-      <button class="btn btn-primary btn-block btn-lg" data-close>เสร็จ</button>
+      ${log.cooldownDone ? '' : `<button class="btn btn-primary btn-block btn-lg" data-cool>🧘 ยืดเหยียดคูลดาวน์ (~${routineMinutes('cool')} นาที)</button>`}
+      <button class="btn ${log.cooldownDone ? 'btn-primary' : ''} btn-block btn-lg" data-close>${log.cooldownDone ? 'เสร็จ' : 'ข้าม เสร็จเลย'}</button>
     </div>`,
   });
 }

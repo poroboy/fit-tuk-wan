@@ -570,3 +570,10 @@ details.roadmap[open] summary h3::after { content: ' ▴'; }
 .count-ov em { font-style: normal; font-size: 11.5px; color: var(--m-back); font-weight: 700; }
 .count-ov.wait b { color: var(--muted); }
 .player .fig-view { display: none; }
+
+/* warm-up / cool-down */
+.routine-card .rt-ico { font-size: 28px; width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; background: var(--brand-soft); flex: none; }
+.routine-card.done { background: color-mix(in srgb, var(--ok-soft) 55%, var(--surface)); }
+.rt-moves { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.rt-moves .chip { border: 0; cursor: pointer; }
+.warm-cta { background: var(--brand-soft); box-shadow: none; }
