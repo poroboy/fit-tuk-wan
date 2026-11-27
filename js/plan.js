@@ -40,10 +40,10 @@ export function timeToMin(hhmm) {
 // ---------- phases ----------
 export const PHASES = [
   { n: 1, from: 1, to: 2, name: 'ปูพื้นฐาน', mode: 'full', sets: 3, reps: '10–12', repsTarget: 12, plank: 30, plankText: '30', note: 'เน้นท่าให้ถูก' },
-  { n: 2, from: 3, to: 4, name: 'เพิ่มความหนัก', mode: 'full', sets: 3, reps: '15', repsTarget: 15, plank: 45, plankText: '45–60', note: 'ลงช้า 3 วินาที' },
-  { n: 3, from: 5, to: 8, name: 'เพิ่มปริมาณ', mode: 'full', sets: 4, reps: '15–20', repsTarget: 18, plank: 60, plankText: '60', note: 'วิดพื้นยกเท้าวางบนเตียง' },
-  { n: 4, from: 9, to: 12, name: 'แยก 2 ชุด', mode: 'split', sets: 3, reps: '12–15 ทีละข้าง', repsTarget: 12, plank: 60, plankText: '60', note: 'ค้าง 2 วิ ตอนยกถึงจุดสุด' },
-  { n: 5, from: 13, to: Infinity, name: 'เพิ่มความยากด้วยเทคนิค', mode: 'split', sets: 3, reps: '15–25 ทีละข้าง', repsTarget: 15, plank: 60, plankText: '60–90', note: 'ดัมเบลเดิม: ลงช้า 4 วิ ค้างบน 2 วิ หรือ 1½ reps ทำจนเหลือแรงแค่ 1–3 ครั้ง' },
+  { n: 2, from: 3, to: 4, name: 'เพิ่มความหนัก', mode: 'full', sets: 3, reps: '12–15', repsTarget: 13, plank: 45, plankText: '45–60', note: 'ลงช้า 3 วินาที' },
+  { n: 3, from: 5, to: 8, name: 'เพิ่มความยาก', mode: 'full', sets: 3, reps: '12–15', repsTarget: 13, plank: 45, plankText: '45–60', note: 'วิดพื้นยกเท้าวางบนเตียง · ลงช้า 3 วิ + ค้างบน 1 วิ ทุกท่า (หนักขึ้นโดยไม่เพิ่มเวลา)' },
+  { n: 4, from: 9, to: 12, name: 'แยก 2 ชุด (Superset)', mode: 'split', sets: 3, reps: '12–15', repsTarget: 13, plank: 60, plankText: '60', note: 'จับคู่ 2 ท่าทำต่อกันไม่พัก · ค้าง 2 วิ ตอนยกถึงจุดสุด' },
+  { n: 5, from: 13, to: Infinity, name: 'เพิ่มความยากด้วยเทคนิค', mode: 'split', sets: 3, reps: '12–20', repsTarget: 15, plank: 60, plankText: '60–90', note: 'ดัมเบลเดิม: ลงช้า 4 วิ ค้างบน 2 วิ หรือ 1½ reps (เบาไปให้ทำทีละข้าง) ทำจนเริ่มช้าลงชัดๆ' },
 ];
 export function phaseForWeek(week) {
   return PHASES.find(p => week >= p.from && week <= p.to) || PHASES[0];
@@ -59,8 +59,8 @@ export const sessionsPerWeek = phase => Object.keys(SCHEDULE[phase.mode]).length
 
 export const KIND_NAMES = {
   F: 'ชุดรวม · ทำวนเป็นรอบ',
-  A: 'ชุด A · อก + หลังแขน + ท้อง',
-  B: 'ชุด B · ไหล่ + หน้าแขน + ท้อง',
+  A: 'ชุด A · อก + หลังแขน + หลังบน',
+  B: 'ชุด B · ไหล่ + หน้าแขน + หลัง',
 };
 export const KIND_SHORT = { F: 'ชุดรวม', A: 'ชุด A', B: 'ชุด B' };
 
@@ -107,31 +107,48 @@ export function roadmap(s, today) {
   return { week, phases, next, info };
 }
 
+// when to end a set (no guessing how many reps are left)
+export const STOP_RULE = 'หยุดเมื่อครั้งนั้นยกช้าลงชัดๆ หรือท่าเริ่มเสีย';
+export const LAST_ROUND = 'รอบสุดท้าย ทำให้สุด จนยกต่อไม่ไหวโดยท่ายังถูก';
+
 // one-side-at-a-time exercises ("ต่อข้าง" / "ทีละข้าง")
 export const isPerSide = item => item && item.type !== 'time' && /ข้าง/.test(String(item.text || ''));
 export const SIDE_HINT = 'ทำข้างแรกครบ → สลับข้างทันที (ไม่ต้องพัก) → ครบ 2 ข้างแล้วค่อยกด ✓ ใส่จำนวนครั้งต่อข้าง';
 
 // ---------- prescription ----------
+// F = circuit. A/B = supersets: each inner array is a pair done back-to-back with no rest.
+// 'core' = crunch, swapped for superman (lower back) on Wednesdays — same length, more back work.
 const LISTS = {
-  F: ['pushup', 'db_row', 'shoulder_press', 'curl', 'lateral_raise', 'plank', 'crunch'],
-  A: ['pushup_wide', 'pushup_narrow', 'bench_dip', 'floor_fly', 'oh_triceps', 'reverse_fly', 'plank', 'crunch'],
-  B: ['pushup_pike', 'db_row', 'shoulder_press', 'lateral_raise', 'curl', 'hammer_curl', 'leg_raise', 'russian_twist'],
+  F: ['pushup', 'db_row', 'shoulder_press', 'curl', 'lateral_raise', 'plank', 'core'],
+  A: [['pushup_wide', 'reverse_fly'], ['bench_dip', 'floor_fly'], ['oh_triceps', 'plank']],
+  B: [['pushup_pike', 'db_row'], ['shoulder_press', 'curl'], ['lateral_raise', 'leg_raise']],
 };
 const FIXED = {
-  pushup: { text: 'จนเกือบหมดแรง', target: null },
-  pushup_decline: { text: 'จนเกือบหมดแรง', target: null },
-  pushup_wide: { text: 'จนเกือบหมดแรง', target: null },
+  pushup: { text: 'จนเริ่มช้าลงชัดๆ', target: null },
+  pushup_decline: { text: 'จนเริ่มช้าลงชัดๆ', target: null },
+  pushup_wide: { text: 'จนเริ่มช้าลงชัดๆ', target: null },
   pushup_narrow: { text: '8–12', target: 10 },
   pushup_pike: { text: '8–12', target: 10 },
   bench_dip: { text: '10–15', target: 12 },
   crunch: { text: '15–20', target: 15 },
   leg_raise: { text: '12–15', target: 12 },
   russian_twist: { text: '20 (นับซ้าย+ขวา)', target: 20 },
+  superman: { text: '10–12 (ค้างบน 2 วิ)', target: 12 },
 };
 
-export function prescription(kind, phase, deload) {
+export function prescription(kind, phase, deload, wd = 1) {
   const sets = deload ? 2 : phase.sets;
-  return LISTS[kind].map(id => {
+  const flat = [];
+  LISTS[kind].forEach((g, gi) => (Array.isArray(g) ? g : [g]).forEach(id => flat.push({ id, pair: Array.isArray(g) ? gi : null })));
+  return flat.map(({ id: raw, pair }) => {
+    const id = raw === 'core' ? (wd === 3 ? 'superman' : 'crunch') : raw;
+    const item = presc(id, phase, sets);
+    if (pair != null) item.pair = pair;
+    return item;
+  });
+}
+function presc(id, phase, sets) {
+  {
     const exId = id === 'pushup' && phase.n >= 3 ? 'pushup_decline' : id;
     if (exId === 'plank') {
       return { exId, sets, type: 'time', seconds: phase.plank, text: `${phase.plankText} วิ` };
@@ -140,7 +157,7 @@ export function prescription(kind, phase, deload) {
     let text = f ? f.text : phase.reps;
     if (exId === 'db_row' && !/ข้าง/.test(text)) text += ' ต่อข้าง';
     return { exId, sets, type: 'reps', text, target: f ? f.target : phase.repsTarget };
-  });
+  }
 }
 
 // ---------- logs & streak ----------

@@ -3,14 +3,15 @@ import { workoutLogs } from './data.js';
 import { EXERCISES } from './exercises.js';
 import { figHTML, mountFigures, restartFigure } from './figure.js';
 import { createCounter, speak } from './counter.js';
+import { exerciseAdvice } from './advice.js';
 import { openRoutine, routineMinutes } from './routine.js';
 import { saveLog, meta } from './data.js';
 import { esc, confirmDialog } from './ui.js';
-import { steps, getSet, nextStep, progress, markSet, finishSession, restAfter, lastReps } from './session.js';
+import { steps, getSet, nextStep, progress, markSet, finishSession, restAfter, lastReps, partnerOf } from './session.js';
 import { repsSheet, plankSheet, celebrateSheet, exerciseSheet, muscleChips } from './sheets.js';
 import { startRest, stopRest, addRest, onTimer, remaining, restState, hidePill, fmtSec } from './timer.js';
 import { keepAwake, unlockAudio, beep } from './notify.js';
-import { PHASES, isPerSide, SIDE_HINT } from './plan.js';
+import { PHASES, isPerSide, SIDE_HINT, STOP_RULE, LAST_ROUND } from './plan.js';
 import { refresh } from './app.js';
 
 let el = null, logId = null, unsub = null, screen = 'ex';
@@ -36,6 +37,7 @@ export function openPlayer(id) {
     if (st && screen === 'rest') updateRing();
   });
   draw();
+  startClock();
   history.pushState({ player: 1 }, '');
   window.addEventListener('popstate', onPop);
 }
@@ -56,6 +58,25 @@ export function closePlayer(fromPop = false) {
   refresh(true);
 }
 
+function elapsedText(log) {
+  const sec = Math.max(0, Math.floor((Date.now() - new Date(log.startedAt)) / 1000));
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
+let clockIv = null;
+function startClock() {
+  clearInterval(clockIv);
+  clockIv = setInterval(() => {
+    if (!el) { clearInterval(clockIv); return; }
+    const c = el.querySelector('[data-elapsed]');
+    const log = getLog();
+    if (c && log) {
+      c.textContent = `⏱️ ${elapsedText(log)}`;
+      const over = (Date.now() - new Date(log.startedAt)) / 60000 > 30;
+      c.classList.toggle('warn', over);
+    }
+  }, 1000);
+}
+
 function header(log) {
   const pr = progress(log);
   const st = nextStep(log);
@@ -63,9 +84,11 @@ function header(log) {
   if (st) {
     pos = log.mode === 'full'
       ? `รอบ ${st.setIdx + 1}/${log.plan[st.exIdx].sets} · ท่า ${st.exIdx + 1}/${log.plan.length}`
-      : `ท่า ${st.exIdx + 1}/${log.plan.length} · เซ็ต ${st.setIdx + 1}/${log.plan[st.exIdx].sets}`;
+      : log.plan[st.exIdx].pair != null
+        ? `Superset คู่ ${log.plan[st.exIdx].pair + 1} · รอบ ${st.setIdx + 1}/${log.plan[st.exIdx].sets}`
+        : `ท่า ${st.exIdx + 1}/${log.plan.length} · เซ็ต ${st.setIdx + 1}/${log.plan[st.exIdx].sets}`;
   }
-  return `<div class="player-top"><button class="icon-btn" data-a="close" aria-label="ปิด">✕</button><div class="grow">${pos}</div><span class="chip">${pr.done}/${pr.total}</span></div>
+  return `<div class="player-top"><button class="icon-btn" data-a="close" aria-label="ปิด">✕</button><div class="grow">${pos}</div><span class="chip" data-elapsed title="เวลาที่ใช้ไป">⏱️ ${elapsedText(log)}</span></div>
     <div class="progress"><i style="width:${(pr.pct * 100).toFixed(0)}%"></i></div>`;
 }
 
@@ -93,13 +116,16 @@ function draw() {
     <div class="card">
       <div class="p-target ${String(p.text).length > 8 && p.type !== 'time' ? 'long' : ''}"><b>${p.type === 'time' ? p.seconds + ' วิ' : esc(p.text)}</b><span class="muted">${p.type === 'time' ? 'ค้างไว้' : isPerSide(p) ? 'ครั้ง/ข้าง' : 'ครั้ง'}</span></div>
       ${isPerSide(p) ? `<div class="side-hint" style="margin:6px 0 2px">↔️ ${SIDE_HINT}</div>` : ''}
+      ${(() => { const pi = partnerOf(log.plan, st.exIdx); if (pi < 0) return ''; const nm = EXERCISES[log.plan[pi].exId].nameTh; return `<div class="ss-tag" style="margin:6px 0 2px">🔗 Superset: ${pi > st.exIdx ? `จบแล้วต่อ <b>${esc(nm)}</b> ทันที ไม่ต้องพัก` : `คู่กับ ${esc(nm)} · จบท่านี้แล้วค่อยพัก`}</div>`; })()}
+      ${(() => { const a = exerciseAdvice(p, workoutLogs(), log.id); return a ? `<div class="advice ${a.kind}" style="margin:6px 0 2px">${a.icon} ${esc(a.text)}</div>` : ''; })()}
       <div class="small muted">${last ? `ครั้งก่อน: ${last.reps != null ? last.reps + ' ครั้ง' : last.seconds + ' วิ'}` : 'ครั้งแรกของท่านี้'}${prevSet && prevSet.reps ? ` · เซ็ตที่แล้ว ${prevSet.reps}` : ''}</div>
+      <div class="small" style="margin-top:6px">${p.type !== 'time' ? (st.setIdx === p.sets - 1 ? `🔥 <b>${LAST_ROUND}</b>` : `✋ ${STOP_RULE}`) : ''}</div>
       <div class="small" style="margin-top:6px">📌 ${esc(phase.note)}${log.deload ? ' · สัปดาห์เบา ใช้แรงครึ่งเดียว' : ''}</div>
     </div>
     <div class="p-actions">
       ${p.type === 'time'
         ? `<button class="btn btn-primary btn-lg btn-block" data-a="plank">⏱️ เริ่มจับเวลาแพลงก์</button>`
-        : `<button class="btn btn-primary btn-lg btn-block" data-a="count">🔢 นับให้${p.target ? ` ${p.target} ครั้ง${isPerSide(p) ? '/ข้าง' : ''}` : ' (ทำจนเกือบหมดแรง)'}</button>
+        : `<button class="btn btn-primary btn-lg btn-block" data-a="count">🔢 นับให้${p.target ? ` ${p.target} ครั้ง${isPerSide(p) ? '/ข้าง' : ''}` : ' (จนเริ่มช้าลง)'}</button>
            <button class="btn btn-soft btn-block" data-a="done">ทำเองแล้ว ใส่จำนวนครั้ง ✓</button>`}
       <div class="grid2"><button class="btn" data-a="skip">ข้ามเซ็ตนี้</button><button class="btn" data-a="finish">จบวันนี้</button></div>
     </div>
@@ -226,7 +252,7 @@ function startCount(log, st, p) {
   fig.appendChild(ov);
   actions.innerHTML = `<button class="btn btn-ok btn-lg btn-block" data-a="cstop">✓ เสร็จ / หยุดนับ</button>
     <button class="btn btn-block" data-a="ccancel">ยกเลิกการนับ</button>
-    <p class="tiny muted center">${p.target ? `นับถึง ${p.target}${perSide ? ' ต่อข้าง แล้วบอกให้สลับข้าง' : ''} แล้วหยุดเอง` : 'นับไปเรื่อยๆ กดหยุดเมื่อเกือบหมดแรง'} · ทำตามจังหวะตัวการ์ตูนได้เลย</p>`;
+    <p class="tiny muted center">${p.target ? `นับถึง ${p.target}${perSide ? ' ต่อข้าง แล้วบอกให้สลับข้าง' : ''} แล้วหยุดเอง` : 'นับไปเรื่อยๆ กดหยุดเมื่อดันขึ้นช้าลงชัดๆ'} · ทำตามจังหวะตัวการ์ตูนได้เลย</p>`;
   const cn = ov.querySelector('[data-cn]'), cl = ov.querySelector('[data-cl]'), cs = ov.querySelector('[data-cs]');
   counter = createCounter({
     exId: p.exId,

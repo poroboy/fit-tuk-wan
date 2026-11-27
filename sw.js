@@ -3,13 +3,13 @@ import { kvGet, kvSet } from './js/store.js';
 import { dueReminders } from './js/reminders.js';
 import { mergeSettings } from './js/data.js';
 
-const VERSION = 'v1.2.0';
+const VERSION = 'v1.4.0';
 const CACHE = `fit-${VERSION}`;
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/store.js', './js/data.js', './js/plan.js', './js/exercises.js', './js/figure.js',
   './js/foods.js', './js/nutrition.js', './js/reminders.js', './js/insights.js', './js/ui.js', './js/charts.js',
-  './js/notify.js', './js/timer.js', './js/session.js', './js/sheets.js', './js/player.js', './js/onboarding.js', './js/ai.js', './js/counter.js', './js/suggest.js', './js/routine.js',
+  './js/notify.js', './js/timer.js', './js/session.js', './js/sheets.js', './js/player.js', './js/onboarding.js', './js/ai.js', './js/counter.js', './js/suggest.js', './js/routine.js', './js/advice.js',
   './js/pages/home.js', './js/pages/workout.js', './js/pages/food.js', './js/pages/body.js', './js/pages/settings.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/badge-96.png',
 ];

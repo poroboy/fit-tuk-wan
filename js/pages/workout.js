@@ -1,13 +1,15 @@
 import { settings, saveSettings, workoutLogs, deleteLog, meta } from '../data.js';
-import { ymd, addDays, mondayOf, dayInfo, KIND_NAMES, KIND_SHORT, DAY_SHORT, thaiDate, isComplete, computeStreak, weekProgress, dateStatus, parseYmd, prescription, roadmap, DAYS_TEXT, isPerSide, SIDE_HINT } from '../plan.js';
+import { ymd, addDays, mondayOf, dayInfo, KIND_NAMES, KIND_SHORT, DAY_SHORT, thaiDate, isComplete, computeStreak, weekProgress, dateStatus, parseYmd, prescription, weekday, roadmap, DAYS_TEXT, isPerSide, SIDE_HINT, STOP_RULE, LAST_ROUND } from '../plan.js';
 import { EXERCISES, LIGHT_DB_TRICKS, HEALTH_NOTES } from '../exercises.js';
 import { figHTML } from '../figure.js';
 import { esc, fmt, confirmDialog, openSheet, toast } from '../ui.js';
+import { estimateMinutes, partnerOf } from '../session.js';
 import { activeSession, lastCompletedOn, createSession, markSet, unmarkSet, getSet, progress, finishSession, sessionStats, lastReps, restAfter, todayChoice, nextStep } from '../session.js';
 import { exerciseSheet, repsSheet, plankSheet, celebrateSheet, muscleChips } from '../sheets.js';
 import { startRest } from '../timer.js';
 import { lineChart, barChart } from '../charts.js';
 import { openPlayer } from '../player.js';
+import { exerciseAdvice } from '../advice.js';
 import { openRoutine, ROUTINES, routineMinutes } from '../routine.js';
 import { saveLog, saveMeta } from '../data.js';
 import { refresh } from '../app.js';
@@ -122,8 +124,10 @@ function exCard(log, p, exIdx, plan) {
     <div class="ex-body">
       <button class="ex-name" data-act="info" data-id="${p.exId}">${esc(ex.nameTh)}</button>
       <div class="row wrap" style="gap:6px">${muscleChips(p.exId)}</div>
+      ${p.pair != null ? `<div class="ss-tag">Superset คู่ที่ ${p.pair + 1} · ${partnerOf(plan.plan, exIdx) > exIdx ? 'ท่าแรก ทำแล้วต่อท่าล่างทันที' : 'ท่าที่สอง ต่อจากท่าบนทันที แล้วพัก'}</div>` : ''}
       <div class="ex-target">${p.sets} ${plan.mode === 'full' ? 'รอบ' : 'เซ็ต'} × ${esc(p.text)}</div>
       ${isPerSide(p) ? `<div class="side-hint">↔️ ${SIDE_HINT}</div>` : ''}
+      ${(() => { const a = exerciseAdvice(p, workoutLogs(), log && log.id); return a ? `<div class="advice ${a.kind}">${a.icon} ${esc(a.text)}</div>` : ''; })()}
       <div class="sets">${dots}</div><div class="sets-gap"></div>
     </div>
   </div>`;
@@ -164,12 +168,12 @@ function todayHTML() {
     if (choice.practice) opts.practice = true;
   }
 
-  const items = log ? log.plan : prescription(kind, info.phase, info.deload);
+  const items = log ? log.plan : prescription(kind, info.phase, info.deload, weekday(date));
   const plan = { mode: log ? log.mode : info.phase.mode, plan: items };
   const pr = log ? progress(log) : { done: 0, total: items.reduce((a, p) => a + p.sets, 0), pct: 0 };
   html += `<div class="card">
     <div class="card-h"><div><h3>${esc(KIND_NAMES[kind])}</h3>
-      <div class="card-sub">${items.length} ท่า · ${plan.mode === 'full' ? 'ทำครบทุกท่า = 1 รอบ แล้วพัก 1–2 นาที' : 'ทำท่าละ ' + items[0].sets + ' เซ็ต พัก 45–60 วิ'}</div></div>
+      <div class="card-sub">${items.length} ท่า · ⏱️ ~${estimateMinutes(items, plan.mode)} นาที · ${plan.mode === 'full' ? 'ทำครบทุกท่า = 1 รอบ แล้วพัก' : 'จับคู่ 2 ท่าทำต่อกัน (superset)'}</div></div>
       ${!log && info.phase.mode === 'split' && !choice.practice ? `<div class="seg" style="width:96px"><button class="${kind === 'A' ? 'on' : ''}" data-act="kind" data-k="A">A</button><button class="${kind === 'B' ? 'on' : ''}" data-act="kind" data-k="B">B</button></div>` : ''}
     </div>
     <div class="progress"><i style="width:${(pr.pct * 100).toFixed(0)}%"></i></div>
@@ -209,8 +213,18 @@ function guideBanner(log, items, mode) {
       <div class="guide-round">${Array.from({ length: total }, (_, r) => `<i class="${r < st.setIdx ? 'past' : r === st.setIdx ? 'now' : ''}"></i>`).join('')}</div>
       <div><b>🔁 ตอนนี้รอบ ${st.setIdx + 1}/${total} · ท่า ${st.exIdx + 1}/${items.length}</b>
       <div class="small">ทำ<b>${esc(name)}</b> 1 เซ็ต (${esc(items[st.exIdx].type === 'time' || !/\d/.test(items[st.exIdx].text) ? items[st.exIdx].text : items[st.exIdx].text + ' ครั้ง')}) ${isPerSide(items[st.exIdx]) ? ' <b>ข้างแรก แล้วสลับข้างทันที</b> ครบ 2 ข้าง' : ''} แล้วกดวงกลมเลข <b>${st.setIdx + 1}</b> → ${nextName ? `ไปท่าถัดไป (${esc(nextName)})` : 'จบรอบ พัก 1–2 นาที แล้ววนกลับไปเริ่มท่าแรก'}</div>
+      <div class="tiny" style="margin-top:3px">${st.setIdx === total - 1 ? `🔥 <b>${LAST_ROUND}</b>` : `✋ ${STOP_RULE}`}</div>
       <div class="tiny muted" style="margin-top:2px">ทำครบทุกท่าท่าละ 1 เซ็ต = 1 รอบ แล้ววนกลับมาเริ่มใหม่จนครบ ${total} รอบ</div></div>
     </div>`;
+  }
+  const pi = partnerOf(items, st.exIdx);
+  if (pi >= 0) {
+    const first = pi > st.exIdx;
+    const partner = EXERCISES[items[pi].exId].nameTh;
+    return `<div class="guide"><div><b>🔗 Superset คู่ที่ ${items[st.exIdx].pair + 1} · รอบ ${st.setIdx + 1}/${total}</b>
+    <div class="small">${first ? `ทำ<b>${esc(name)}</b> แล้ว<b>ต่อ${esc(partner)}ทันที</b> ไม่ต้องพัก` : `ทำ<b>${esc(name)}</b> ต่อเลย แล้วค่อยพัก 60 วิ`}</div>
+    <div class="tiny" style="margin-top:3px">${st.setIdx === total - 1 ? `🔥 <b>${LAST_ROUND}</b>` : `✋ ${STOP_RULE}`}</div>
+    <div class="tiny muted" style="margin-top:2px">ทำคู่นี้วน ${total} รอบ แล้วค่อยไปคู่ถัดไป</div></div></div>`;
   }
   return `<div class="guide"><div><b>💪 ท่า ${st.exIdx + 1}/${items.length} · เซ็ต ${st.setIdx + 1}/${total}</b>
     <div class="small">ทำ<b>${esc(name)}</b> ให้ครบ ${total} เซ็ตก่อน (พักระหว่างเซ็ต 45–60 วิ) แล้วค่อยไปท่าถัดไป</div>

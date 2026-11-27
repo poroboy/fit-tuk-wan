@@ -1,7 +1,8 @@
 // Workout session state (create, tick sets, finish, stats)
 import { saveLog, workoutLogs, settings, latestWeight, uid, saveMeta, meta } from './data.js';
-import { dayInfo, prescription, isComplete, findMissed, nextSplitKind, computeStreak, ymd } from './plan.js';
+import { dayInfo, prescription, isComplete, findMissed, nextSplitKind, computeStreak, ymd, weekday } from './plan.js';
 import { EXERCISES, loadPerRep, isPushup } from './exercises.js';
+import { tempoLength } from './figure.js';
 
 export function logsForDate(date) {
   return workoutLogs().filter(l => l.date === date);
@@ -20,7 +21,7 @@ export function createSession(date, kind, { makeupFor = null, extra = false } = 
   const week = info.prestart ? 0 : info.week;
   const phase = info.phase;
   const deload = info.deload;
-  const plan = prescription(kind, phase, deload);
+  const plan = prescription(kind, phase, deload, weekday(date));
   const sets = [];
   plan.forEach((p, exIdx) => {
     for (let k = 0; k < p.sets; k++) sets.push({ exIdx, exerciseId: p.exId, setIndex: k, reps: null, seconds: null, done: false });
@@ -41,9 +42,26 @@ export function steps(log) {
   if (log.mode === 'full') {
     for (let r = 0; r < maxSets; r++) log.plan.forEach((p, i) => { if (r < p.sets) out.push({ exIdx: i, setIdx: r }); });
   } else {
-    log.plan.forEach((p, i) => { for (let r = 0; r < p.sets; r++) out.push({ exIdx: i, setIdx: r }); });
+    // supersets: items sharing a `pair` alternate set by set (A1, A2, A1, A2…); single items go set by set
+    const groups = [];
+    log.plan.forEach((p, i) => {
+      const g = p.pair != null ? groups.find(x => x.pair === p.pair) : null;
+      if (g) g.idx.push(i); else groups.push({ pair: p.pair, idx: [i] });
+    });
+    for (const g of groups) {
+      const n = Math.max(...g.idx.map(i => log.plan[i].sets));
+      for (let r = 0; r < n; r++) g.idx.forEach(i => { if (r < log.plan[i].sets) out.push({ exIdx: i, setIdx: r }); });
+    }
   }
   return out;
+}
+export const SUPERSET_GAP = 10; // seconds to switch to the partner exercise
+
+// partner exercise index in the same superset pair (or -1)
+export function partnerOf(plan, exIdx) {
+  const p = plan[exIdx];
+  if (!p || p.pair == null) return -1;
+  return plan.findIndex((x, i) => i !== exIdx && x.pair === p.pair);
 }
 export const getSet = (log, exIdx, setIdx) => log.sets.find(s => s.exIdx === exIdx && s.setIndex === setIdx);
 export function nextStep(log) {
@@ -121,7 +139,33 @@ export function restAfter(log, exIdx, setIdx) {
       ? { sec: s.roundRestSec, label: `จบรอบที่ ${setIdx + 1} · พัก 1–2 นาที`, next: nextName, step: nxt }
       : { sec: s.circuitGapSec, label: 'เปลี่ยนท่า', next: nextName, step: nxt };
   }
-  return { sec: s.restSec, label: nxt.exIdx === exIdx ? 'พักระหว่างเซ็ต' : 'เปลี่ยนท่า', next: nextName, step: nxt };
+  const cur = log.plan[exIdx], nx = log.plan[nxt.exIdx];
+  if (cur.pair != null && nx.pair === cur.pair && nxt.exIdx !== exIdx && nxt.setIdx === setIdx) {
+    // second half of a superset: go straight to the partner
+    return { sec: SUPERSET_GAP, label: 'Superset · ต่อท่าคู่ทันที', next: nextName, step: nxt };
+  }
+  const endPair = cur.pair != null;
+  return { sec: s.restSec, label: endPair ? (nx.pair === cur.pair ? 'จบ 1 รอบของคู่นี้ · พัก' : 'จบคู่นี้ · พักแล้วไปคู่ถัดไป') : nxt.exIdx === exIdx ? 'พักระหว่างเซ็ต' : 'เปลี่ยนท่า', next: nextName, step: nxt };
+}
+
+// rough minutes for a session (excluding warm-up / cool-down)
+export function estimateMinutes(plan, mode) {
+  const s = settings();
+  const fake = { mode, plan, sets: [] };
+  plan.forEach((p, i) => { for (let k = 0; k < p.sets; k++) fake.sets.push({ exIdx: i, setIndex: k, done: false }); });
+  const order = steps(fake);
+  let sec = 0;
+  order.forEach((st, n) => {
+    const p = plan[st.exIdx];
+    const work = p.type === 'time' ? p.seconds : (p.target || 12) * tempoLength(p.exId) * 0.8;
+    sec += work * (/ข้าง/.test(String(p.text)) && p.type !== 'time' ? 2 : 1) + 8;
+    const nx = order[n + 1];
+    if (!nx) return;
+    if (mode === 'full') sec += nx.setIdx !== st.setIdx ? s.roundRestSec : s.circuitGapSec;
+    else if (p.pair != null && plan[nx.exIdx].pair === p.pair && nx.exIdx !== st.exIdx && nx.setIdx === st.setIdx) sec += SUPERSET_GAP;
+    else sec += s.restSec;
+  });
+  return Math.round(sec / 60);
 }
 
 export function todayChoice(date) {

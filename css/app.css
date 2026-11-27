@@ -577,3 +577,11 @@ details.roadmap[open] summary h3::after { content: ' ▴'; }
 .rt-moves { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .rt-moves .chip { border: 0; cursor: pointer; }
 .warm-cta { background: var(--brand-soft); box-shadow: none; }
+
+.advice { font-size: 12.5px; line-height: 1.4; padding: 5px 9px; border-radius: 10px; background: var(--surface-2); }
+.advice.up { background: var(--warn-soft); color: color-mix(in srgb, var(--warn) 70%, var(--text)); font-weight: 600; }
+.advice.ok { background: var(--ok-soft); }
+.advice.low { background: var(--water-soft); }
+
+.ss-tag { font-size: 12px; font-weight: 600; color: var(--protein); background: var(--protein-soft); padding: 4px 9px; border-radius: 10px; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }

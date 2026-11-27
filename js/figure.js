@@ -523,6 +523,24 @@ function childPosePose(p) {
   };
   const it = []; sideBody(it, j); return it;
 }
+function supermanPose(p) {
+  const hip = P(92, 118.5);
+  const a = lerp(-1, -11, p);
+  const neck = pol(hip, a, 34), sh = pol(hip, a, 31);
+  const aa = lerp(-3, -15, p);
+  const elN = pol(sh, aa, 20), haN = pol(elN, aa, 18);
+  const shF = P(sh.x - 2, sh.y - 1), elF = pol(shF, aa - 1, 20), haF = pol(elF, aa - 1, 18);
+  const la = lerp(181, 193, p);
+  const knN = pol(hip, la, 27), anN = pol(knN, la, 26);
+  const hipF = P(94, 117.5), knF = pol(hipF, la + 1, 27), anF = pol(knF, la + 1, 26);
+  const j = {
+    hip, hipF, neck, head: pol(neck, a - 4, 13), up: a - 4,
+    knN, anN, toN: pol(anN, la + 90, 6), knF, anF, toF: pol(anF, la + 91, 6),
+    shN: sh, elN, haN, shF, elF, haF,
+  };
+  const it = []; sideBody(it, j); return it;
+}
+const SUPER = [[1, 1.0, 'ยกแขนขาขึ้น'], [1, 2.0, 'ค้าง 2 วิ'], [0, 1.6, 'ลงช้าๆ'], [0, 0.5, '']];
 const JACK = [[1, 0.7, 'ก้าวออก แขนขึ้น'], [0, 0.7, 'กลับ'], [0, 0.2, '']];
 const CIRCLE = [[1, 4, 'หมุนแขนต่อเนื่อง'], [0, 4, 'หมุนแขนต่อเนื่อง']];
 const SWING = [[1, 0.7, 'กอดอก'], [0, 0.7, 'กางแขน']];
@@ -608,6 +626,7 @@ const ANIMS = {
   reverse_fly: { tempo: RFLY, props: () => floor(shadow(100, 24)), pose: reverseFlyPose },
   bench_dip: { tempo: PUSH, props: () => floor(dipBed() + shadow(95, 26)), pose: dipPose },
   russian_twist: { vb: LOW, tempo: TWIST, props: () => floor(mat(50, 150)), pose: twistPose },
+  superman: { vb: LOW, tempo: SUPER, props: () => floor(mat(14, 186)), pose: supermanPose },
   step_jack: { tempo: JACK, props: () => floor(shadow(100, 26)), pose: stepJackPose },
   arm_circles: { tempo: CIRCLE, props: () => floor(shadow(100, 24)), pose: armCirclePose },
   arm_swing: { tempo: SWING, props: () => floor(shadow(100, 24)), pose: armSwingPose },
