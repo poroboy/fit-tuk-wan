@@ -6,7 +6,8 @@ import { BOARD_COLOR_NAMES, setBoardColors } from '../figure.js';
 import { esc, fmt, toast, confirmDialog, download } from '../ui.js';
 import { exportAll, importAll, clearAll } from '../store.js';
 import { notifPermission, requestNotif, showNotif, calendarEvents, gcalLink, icsText, registerPeriodic } from '../notify.js';
-import { refresh, applyTheme } from '../app.js';
+import { refresh, applyTheme, checkForUpdate } from '../app.js';
+import { APP_VERSION, CHANGELOG } from '../version.js';
 import { aiKey, saveAiKey, clearAiKey, testKey, aiModels, aiModel, setAiModel } from '../ai.js';
 
 export const title = 'ตั้งค่า';
@@ -98,11 +99,34 @@ export function render() {
 
     <div class="section-title">ข้อควรระวังด้านสุขภาพ</div>
     <div class="card"><ul style="margin:0;padding-left:18px">${HEALTH_NOTES.map(n => `<li style="margin:4px 0">${esc(n)}</li>`).join('')}</ul></div>
-    <p class="tiny muted center">ฟิตทุกวัน · ใช้งานออฟไลน์ได้ · ไม่มีการเก็บข้อมูลขึ้นเซิร์ฟเวอร์</p>
+    <div class="section-title">เวอร์ชัน</div>
+    <div class="card col">
+      <div class="row"><div class="grow"><b style="font-size:20px">ฟิตทุกวัน v${APP_VERSION}</b>
+        <div class="small muted" data-cachever>กำลังเช็คเวอร์ชันที่ติดตั้ง…</div></div>
+        <button class="btn btn-soft btn-sm" data-act="update">🔄 เช็คอัปเดต</button></div>
+      <details class="more"><summary>มีอะไรใหม่</summary>${CHANGELOG.map(c => `<div style="margin-top:8px"><b class="small">v${c.v}${c.v === APP_VERSION ? ' (ตอนนี้)' : ''}</b><ul style="margin:2px 0 0">${c.items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></div>`).join('')}</details>
+    </div>
+    <p class="tiny muted center">ฟิตทุกวัน v${APP_VERSION} · ใช้งานออฟไลน์ได้ · ไม่มีการเก็บข้อมูลขึ้นเซิร์ฟเวอร์</p>
   </div>`;
 }
 
+async function showCacheVersion(root) {
+  const el = root.querySelector('[data-cachever]');
+  if (!el) return;
+  try {
+    const keys = (await caches.keys()).filter(k => k.startsWith('fit-v'));
+    const installed = keys.length ? keys.sort().pop().replace('fit-v', '') : null;
+    el.textContent = !installed ? 'ใช้งานแบบออนไลน์ (ยังไม่ได้แคชไว้ใช้ออฟไลน์)'
+      : installed === APP_VERSION ? `ติดตั้งแล้ว ใช้ออฟไลน์ได้ ✓ (v${installed})`
+        : `ไฟล์ออฟไลน์ยังเป็น v${installed} ปิดแล้วเปิดแอปใหม่อีกครั้ง`;
+  } catch { el.textContent = ''; }
+}
+
 export function mount(root) {
+  showCacheVersion(root);
+  // the offline copy may still be installing — check again once it settles
+  if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then(() => setTimeout(() => showCacheVersion(root), 1500));
+  setTimeout(() => showCacheVersion(root), 4000);
   root.addEventListener('change', async e => {
     const el = e.target;
     if (el.dataset.p) {
@@ -165,6 +189,12 @@ export function mount(root) {
       refresh(true);
     } else if (act === 'aiforget') {
       if (await confirmDialog('ลบ Gemini API key ออกจากเครื่องนี้?', { ok: 'ลบ key', danger: true })) { await clearAiKey(); refresh(true); }
+    }
+    else if (act === 'update') {
+      t.disabled = true; t.textContent = 'กำลังเช็ค…';
+      const r = await checkForUpdate();
+      toast(r === 'updating' ? 'พบเวอร์ชันใหม่ กำลังโหลด แอปจะรีเฟรชเอง…' : r === 'offline' ? 'ไม่ได้ต่อเน็ต เช็คอัปเดตไม่ได้' : `เป็นเวอร์ชันล่าสุดแล้ว (v${APP_VERSION}) ✅`, 3500);
+      t.disabled = false; t.textContent = '🔄 เช็คอัปเดต';
     }
     else if (act === 'resetOffset') { await saveSettings({ weekOffset: 0 }); refresh(true); }
     else if (act === 'export') {

@@ -6,6 +6,8 @@ import { mountFigures, setBoardColors } from './figure.js';
 import { flameSVG, toast } from './ui.js';
 import { startReminderLoop, registerPeriodic, unlockAudio } from './notify.js';
 import { showOnboarding } from './onboarding.js';
+import { APP_VERSION, CHANGELOG } from './version.js';
+import { meta, saveMeta } from './data.js';
 import * as home from './pages/home.js';
 import * as workout from './pages/workout.js';
 import * as food from './pages/food.js';
@@ -72,12 +74,42 @@ async function boot() {
   if (!profile().setupDone) showOnboarding(() => refresh());
   startReminderLoop();
   registerSW();
+  announceVersion();
+}
+
+// tell the user when the app just updated (and what changed)
+function announceVersion() {
+  const seen = meta().seenVersion;
+  if (seen === APP_VERSION) return;
+  saveMeta({ seenVersion: APP_VERSION });
+  if (!profile().setupDone) return; // brand-new install: nothing to announce
+  const c = CHANGELOG.find(x => x.v === APP_VERSION);
+  setTimeout(() => toast(`🎉 อัปเดตเป็น v${APP_VERSION} แล้ว${c ? ' · ' + c.items[0] : ''}`, 5000), 1200);
+}
+
+let swReg = null, reloadOnChange = false;
+export async function checkForUpdate() {
+  if (!navigator.onLine) return 'offline';
+  if (!swReg) { location.reload(); return 'updating'; }
+  reloadOnChange = true;
+  await swReg.update();
+  if (swReg.installing || swReg.waiting) return 'updating';
+  // no new service worker: still make sure the page itself is the newest copy
+  try {
+    const res = await fetch('js/version.js', { cache: 'no-store' });
+    const m = (await res.text()).match(/APP_VERSION = '([^']+)'/);
+    if (m && m[1] !== APP_VERSION) { setTimeout(() => location.reload(), 800); return 'updating'; }
+  } catch { return 'offline'; }
+  reloadOnChange = false;
+  return 'latest';
 }
 
 async function registerSW() {
   if (!('serviceWorker' in navigator)) return;
   try {
     const reg = await navigator.serviceWorker.register('sw.js', { type: 'module' });
+    swReg = reg;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (reloadOnChange) location.reload(); });
     registerPeriodic();
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
